@@ -1,7 +1,7 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 
-import { PostgreSQLDatabase } from './database/postgres';
+import { AppDataSource } from './database/index';
 
 import mainRoutes from './routes/index';
 import customerRoutes from './routes/customer';
@@ -13,10 +13,8 @@ const port = 3000;
  * main function connects to customer database and starts server
  */
 async function main() {
-	const postgreSQL = PostgreSQLDatabase.getInstance();
-
 	try {
-		await postgreSQL.connect();
+		await AppDataSource.initialize();
 		console.log('Connected to PostgreSQL database');
 
 		app.use(bodyParser.json());
@@ -28,7 +26,6 @@ async function main() {
 			console.log(`Customer service listening on port ${port}`);
 		});
 	} catch (error) {
-		// Don't forget to release the client after use: client.release();
 		throw error;
 	}
 }
