@@ -74,7 +74,7 @@ const createContact = async (
  * @param phoneNumber 
  * @returns Boolean
  */
-const isGivenContactDuplicate = async (contacts: Contact[], email: string | null, phoneNumber: string | null) => {
+const isGivenContactDuplicate = (contacts: Contact[], email: string | null, phoneNumber: string | null) => {
     const isDuplicate = contacts.find((contact) => (
         (contact.email === email && contact.phoneNumber === phoneNumber) ||
         (email === null && contact.phoneNumber === phoneNumber) ||

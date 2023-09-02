@@ -46,7 +46,7 @@ router.post('/identify', async (req: Request, res: Response) => {
             response.phoneNumbers = contacts.map(({ phoneNumber }) => phoneNumber);
 
             if (primaryContacts.length == 1) {
-                // create secondary contact if there is only 1 primary contact
+                // create secondary contact if there is only 1 primary contact and given contact is new
                 response.secondaryContactIds = contacts.filter((contact) => contact.id !== primaryContactId).map((contact) => contact.id);
 
                 const isDuplicate = isGivenContactDuplicate(
@@ -55,21 +55,23 @@ router.post('/identify', async (req: Request, res: Response) => {
                     phoneNumber
                 );
 
+                console.log(`contact is duplicate: ${isDuplicate}`);
+
                 if (!isDuplicate) {
-                    console.log('creating secondary contact', isDuplicate);
-                    const customer = await createContact(
+                    console.log('creating secondary contact');
+                    const contact = await createContact(
                         email,
                         phoneNumber,
                         'secondary',
                         existingContacts[0].id
                     );
 
-                    response.emails.push(customer.email);
-                    response.phoneNumbers.push(customer.phoneNumber);
-                    response.secondaryContactIds.push(customer.id);
+                    response.emails.push(contact.email);
+                    response.phoneNumbers.push(contact.phoneNumber);
+                    response.secondaryContactIds.push(contact.id);
                 }
             } else {
-                // handle multiple primary contacts by updating latest primary contacts with secondary
+                // handle multiple primary contacts by updating other primary contacts with secondary
                 console.log('multiple primary contacts');
                 for (let index = 1; index < primaryContacts.length; index++) {
                     let contact = primaryContacts[index];
@@ -94,10 +96,22 @@ router.post('/identify', async (req: Request, res: Response) => {
     }
 });
 
-router.delete('/contact', async (req: Request, res: Response) => {
-    const { id } = req.body;
+router.get('/contact/all', async (req: Request, res: Response) => {
+    const contacts = await contactRepositary.find();
 
-    await contactRepositary.delete({ id: id });
+    return res.json({ contacts });
+});
+
+router.delete('/contact/:id', async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    const contactId = parseInt(id) || 0;
+
+    if (contactId) {
+        await contactRepositary.delete({ id: contactId });
+    } else {
+        // throw bad request
+    }
 
     return res.json({ success: true });
 });
