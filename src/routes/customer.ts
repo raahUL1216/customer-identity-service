@@ -34,7 +34,6 @@ router.post('/identify', async (req: Request, res: Response) => {
         } else {
             const parentIds = existingContacts.map((contact) => (contact.parentId || contact.id))
             const contacts = await getAllContacts(parentIds);
-            console.log(contacts);
 
             const primaryContacts = findPrimaryContacts(contacts);
             const primaryContactId = primaryContacts ? primaryContacts[0]?.id : null;
@@ -53,10 +52,7 @@ router.post('/identify', async (req: Request, res: Response) => {
                     phoneNumber
                 );
 
-                console.log(`contact is duplicate: ${isDuplicate}`);
-
                 if (!isDuplicate) {
-                    console.log('creating secondary contact');
                     const linkedId = findLinkedId(contacts, email, phoneNumber);
 
                     const contact = await createContact(
@@ -73,7 +69,6 @@ router.post('/identify', async (req: Request, res: Response) => {
                 }
             } else {
                 // handle multiple primary contacts by updating other primary contacts with secondary
-                console.log('multiple primary contacts');
                 for (let index = 1; index < primaryContacts.length; index++) {
                     let contact = primaryContacts[index];
                     contact.linkedId = primaryContactId;
