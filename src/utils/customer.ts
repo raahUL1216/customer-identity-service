@@ -20,11 +20,13 @@ const findExistingContacts = async (email: string, phoneNumber: string) => {
 }
 
 /**
- * gets all contacts based on parent ids (parent + children)
- * @param parentIds
+ * gets all contacts based on existing contacts (parent + children)
+ * @param contacts
  * @returns Contact[]
  */
-const getAllContacts = async (parentIds: number[]) => {
+const getAllContacts = async (contacts: Contact[]) => {
+    const parentIds = contacts.map((contact) => (contact.parentId || contact.id))
+
     if (!parentIds?.length) {
         return [];
     }

@@ -32,8 +32,8 @@ router.post('/identify', async (req: Request, res: Response) => {
             response.emails.push(newContact.email);
             response.phoneNumbers.push(newContact.phoneNumber);
         } else {
-            const parentIds = existingContacts.map((contact) => (contact.parentId || contact.id))
-            const contacts = await getAllContacts(parentIds);
+            // get all relevant existing contacts
+            const contacts = await getAllContacts(existingContacts);
 
             const primaryContacts = findPrimaryContacts(contacts);
             const primaryContactId = primaryContacts ? primaryContacts[0]?.id : null;
