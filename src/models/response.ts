@@ -1,8 +1,8 @@
 type IdentityResponse = {
-    primaryContactId: number | null | undefined;
-    emails: any[];
-    phoneNumbers: any[];
-    secondaryContactIds: any[];
+    primaryContactId: number | null;
+    emails: (string | null)[];
+    phoneNumbers: (string | null)[];
+    secondaryContactIds: number[];
 };
 
 /**

@@ -5,7 +5,6 @@ import { Contact } from '../entity/contact';
 import { AppDataSource } from '../database';
 
 import { createContact, findExistingContacts, findPrimaryContacts, getAllContacts, isGivenContactDuplicate } from '../utils/customer';
-import { removeDuplicates } from '../utils/miscellaneous';
 
 const router = express.Router();
 
@@ -84,9 +83,9 @@ router.post('/identify', async (req: Request, res: Response) => {
             }
 
             // prepare response
-            response.emails = removeDuplicates(response.emails);
-            response.phoneNumbers = removeDuplicates(response.phoneNumbers);
-            response.secondaryContactIds = removeDuplicates(response.secondaryContactIds);
+            response.emails = [...new Set(response.emails)];
+            response.phoneNumbers = [...new Set(response.phoneNumbers)];
+            response.secondaryContactIds = [...new Set(response.secondaryContactIds)]
         }
 
         return res.json({ contact: response });
