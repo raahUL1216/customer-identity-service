@@ -1,11 +1,10 @@
 import express, { Request, Response } from 'express';
-import { IdentityResponse } from '../models/response';
+import { initializeResponse } from '../models/response';
 
-import { In } from 'typeorm';
 import { Contact } from '../entity/contact';
 import { AppDataSource } from '../database';
 
-import { createCustomerContact } from '../utils/customer';
+import { createContact, findExistingContacts, findPrimaryContacts, getAllContacts } from '../utils/customer';
 import { removeDuplicates } from '../utils/miscellaneous';
 
 const router = express.Router();
@@ -17,82 +16,72 @@ const contactRepositary = AppDataSource.getRepository(Contact);
  */
 router.post('/identify', async (req: Request, res: Response) => {
     const { email, phoneNumber } = req.body;
-    const response: IdentityResponse = {
-        primaryContactId: null,
-        emails: [],
-        phoneNumbers: [],
-        secondaryContactIds: []
-    };
+    const response = initializeResponse();
 
     try {
-        // Check if a contact already exists
-        const existingContacts = await contactRepositary.find({
-            where: [
-                { email: email },
-                { phoneNumber: phoneNumber },
-            ],
-        });
-
-        console.log(`total customers: ${existingContacts.length}`);
+        const existingContacts = await findExistingContacts(email, phoneNumber);
+        console.log(`total existing contacts: ${existingContacts.length}`);
 
         if (existingContacts.length === 0) {
-            // if given contact does not exists, create primary contact
-            const customer = await createCustomerContact(
+            // if new contact details provided, create primary contact
+            const newContact = await createContact(
                 email,
-                phoneNumber
+                phoneNumber,
+                'primary'
             );
 
-            response.primaryContactId = customer.id;
-            response.emails.push(customer.email);
-            response.phoneNumbers.push(customer.phoneNumber);
+            response.primaryContactId = newContact.id;
+            response.emails.push(newContact.email);
+            response.phoneNumbers.push(newContact.phoneNumber);
         } else {
-            let emails = existingContacts.map(({ email }) => email).filter((email) => !!email);
-            let phoneNumbers = existingContacts.map(({ phoneNumber }) => phoneNumber).filter((phoneNumber) => !!phoneNumber);
-            let secondaryContactIds = existingContacts.map(({ linkedId }) => linkedId).filter((linkedId) => !!linkedId);
-
-            console.log(emails);
-            console.log(phoneNumbers);
-            console.log(secondaryContactIds);
-
-            const contacts = await contactRepositary.find({
-                where: [
-                    { email: In(emails) },
-                    { phoneNumber: In(phoneNumbers) },
-                    { linkedId: In(secondaryContactIds) }
-                ]
-            });
-
+            const contacts = await getAllContacts(existingContacts);
             console.log(contacts);
 
-            // extract primary contact
-            const primaryContact = contacts.find((contact) => contact.linkPrecedence === 'primary');
-            const primaryContactId = primaryContact?.id;
+            const primaryContacts = findPrimaryContacts(contacts);
+            const primaryContactId = primaryContacts ? primaryContacts[0]?.id : null;
 
-            // map existing contact in response
+            // add existing email and phone contacts in response
+            response.primaryContactId = primaryContactId;
             response.emails = contacts.map(({ email }) => email);
             response.phoneNumbers = contacts.map(({ phoneNumber }) => phoneNumber);
-            response.secondaryContactIds = contacts.filter((contact) => contact.id !== primaryContactId).map((contact) => contact.id)
 
-            // create new secondary contact if new contact is provided
-            const sameContact = contacts.find((contact) => (
-                (contact.email === email && contact.phoneNumber === phoneNumber) ||
-                (email === null && contact.phoneNumber === phoneNumber) ||
-                (contact.email === email && phoneNumber === null)
-            ));
+            if (primaryContacts.length == 1) {
+                // map secondary contacts in response
+                response.secondaryContactIds = contacts.filter((contact) => contact.id !== primaryContactId).map((contact) => contact.id);
 
-            // console.log(sameContact);
+                // create new secondary contact if new contact is provided
+                const sameContact = contacts.find((contact) => (
+                    (contact.email === email && contact.phoneNumber === phoneNumber) ||
+                    (email === null && contact.phoneNumber === phoneNumber) ||
+                    (contact.email === email && phoneNumber === null)
+                ));
 
-            if (!sameContact) {
-                console.log('creating secondary contact');
-                const customer = await createCustomerContact(email, phoneNumber, existingContacts[0].id, 'secondary');
+                if (!sameContact) {
+                    console.log('creating secondary contact', sameContact);
+                    const customer = await createContact(
+                        email,
+                        phoneNumber,
+                        'secondary',
+                        existingContacts[0].id
+                    );
 
-                response.emails.push(customer.email);
-                response.phoneNumbers.push(customer.phoneNumber);
-                response.secondaryContactIds.push(customer.id);
+                    response.emails.push(customer.email);
+                    response.phoneNumbers.push(customer.phoneNumber);
+                    response.secondaryContactIds.push(customer.id);
+                }
+            } else {
+                console.log('multiple primary contacts');
+                for (let index = 1; index < primaryContacts.length; index++) {
+                    let contact = primaryContacts[index];
+                    contact.linkedId = primaryContactId;
+                    contact.linkPrecedence = 'secondary';
+
+                    await contactRepositary.save(contact);
+                    response.secondaryContactIds.push(contact.id);
+                }
             }
 
             // prepare response
-            response.primaryContactId = primaryContactId;
             response.emails = removeDuplicates(response.emails);
             response.phoneNumbers = removeDuplicates(response.phoneNumbers);
             response.secondaryContactIds = removeDuplicates(response.secondaryContactIds);

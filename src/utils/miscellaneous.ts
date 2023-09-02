@@ -8,7 +8,7 @@ const removeDuplicates = (arr: any) => {
         return [];
     }
 
-    return Array.from(new Set(arr));
+    return [...new Set(arr)];
 }
 
 export { removeDuplicates };
