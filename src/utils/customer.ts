@@ -68,6 +68,23 @@ const createContact = async (
 }
 
 /**
+ * check if given contact is duplicate
+ * @param contacts 
+ * @param email 
+ * @param phoneNumber 
+ * @returns Boolean
+ */
+const isGivenContactDuplicate = async (contacts: Contact[], email: string | null, phoneNumber: string | null) => {
+    const isDuplicate = contacts.find((contact) => (
+        (contact.email === email && contact.phoneNumber === phoneNumber) ||
+        (email === null && contact.phoneNumber === phoneNumber) ||
+        (contact.email === email && phoneNumber === null)
+    ));
+
+    return !!isDuplicate;
+}
+
+/**
  * extract email, phone and secondary contacts as seperate arrays
  * @param existingContacts 
  * @returns { emails: [], phoneNumbers: [], secondaryContactIds: []}
@@ -89,4 +106,4 @@ const findPrimaryContacts = (contacts: Contact[]) => {
     return contacts.filter((contact) => contact.linkPrecedence === 'primary');
 }
 
-export { findExistingContacts, getAllContacts, createContact, findPrimaryContacts };
+export { findExistingContacts, getAllContacts, createContact, isGivenContactDuplicate, findPrimaryContacts };

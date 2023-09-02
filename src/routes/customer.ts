@@ -4,7 +4,7 @@ import { initializeResponse } from '../models/response';
 import { Contact } from '../entity/contact';
 import { AppDataSource } from '../database';
 
-import { createContact, findExistingContacts, findPrimaryContacts, getAllContacts } from '../utils/customer';
+import { createContact, findExistingContacts, findPrimaryContacts, getAllContacts, isGivenContactDuplicate } from '../utils/customer';
 import { removeDuplicates } from '../utils/miscellaneous';
 
 const router = express.Router();
@@ -46,18 +46,17 @@ router.post('/identify', async (req: Request, res: Response) => {
             response.phoneNumbers = contacts.map(({ phoneNumber }) => phoneNumber);
 
             if (primaryContacts.length == 1) {
-                // map secondary contacts in response
+                // create secondary contact if there is only 1 primary contact
                 response.secondaryContactIds = contacts.filter((contact) => contact.id !== primaryContactId).map((contact) => contact.id);
 
-                // create new secondary contact if new contact is provided
-                const sameContact = contacts.find((contact) => (
-                    (contact.email === email && contact.phoneNumber === phoneNumber) ||
-                    (email === null && contact.phoneNumber === phoneNumber) ||
-                    (contact.email === email && phoneNumber === null)
-                ));
+                const isDuplicate = isGivenContactDuplicate(
+                    contacts,
+                    email,
+                    phoneNumber
+                );
 
-                if (!sameContact) {
-                    console.log('creating secondary contact', sameContact);
+                if (!isDuplicate) {
+                    console.log('creating secondary contact', isDuplicate);
                     const customer = await createContact(
                         email,
                         phoneNumber,
@@ -70,6 +69,7 @@ router.post('/identify', async (req: Request, res: Response) => {
                     response.secondaryContactIds.push(customer.id);
                 }
             } else {
+                // handle multiple primary contacts by updating latest primary contacts with secondary
                 console.log('multiple primary contacts');
                 for (let index = 1; index < primaryContacts.length; index++) {
                     let contact = primaryContacts[index];
