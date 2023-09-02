@@ -1,4 +1,4 @@
-# Customer Identify Service
+# Customer Identity Service
 
 ## Development server
 > npm run start
