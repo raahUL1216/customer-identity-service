@@ -22,6 +22,9 @@ export class Contact {
     @Column({ type: 'int', nullable: true })
     linkedId: number | null;
 
+    @Column({ type: 'int', nullable: true })
+    parentId: number | null;
+
     @Column({ type: 'enum', enum: ['primary', 'secondary'] })
     linkPrecedence: 'primary' | 'secondary';
 

@@ -5,7 +5,7 @@ import { In } from 'typeorm';
 const contactRepositary = AppDataSource.getRepository(Contact);
 
 /**
- * get existing contacts based on email or phoneNumber
+ * find existing contacts based on email or phoneNumber
  * @param email 
  * @param phoneNumber 
  * @returns Contact[]
@@ -20,20 +20,19 @@ const findExistingContacts = async (email: string, phoneNumber: string) => {
 }
 
 /**
- * gets all contacts based on given emails, phone numbers and linked contacts
- * @param emails 
- * @param phoneNumbers 
- * @param secondaryContactIds 
+ * gets all contacts based on parent ids (parent + children)
+ * @param parentIds
  * @returns Contact[]
  */
-const getAllContacts = async (existingContacts: Contact[]) => {
-    const { emails, phoneNumbers, secondaryContactIds } = extractContactData(existingContacts);
+const getAllContacts = async (parentIds: number[]) => {
+    if (!parentIds?.length) {
+        return [];
+    }
 
     return contactRepositary.find({
         where: [
-            { email: In(emails) },
-            { phoneNumber: In(phoneNumbers) },
-            { linkedId: In(secondaryContactIds) }
+            { id: In(parentIds) },
+            { parentId: In(parentIds) }
         ],
         order: {
             createdAt: "ASC"
@@ -47,13 +46,15 @@ const getAllContacts = async (existingContacts: Contact[]) => {
  * @param phoneNumber 
  * @param linkPrecedence 
  * @param primaryContactId 
+ * @param parentId
  * @returns Contact
  */
 const createContact = async (
     email: string,
     phoneNumber: string,
     linkPrecedence: 'primary' | 'secondary' = 'primary',
-    primaryContactId: number | null = null
+    primaryContactId: number | null = null,
+    parentId: number | null = null
 ) => {
     const customer = new Contact();
 
@@ -61,6 +62,7 @@ const createContact = async (
     customer.phoneNumber = phoneNumber;
     customer.linkedId = primaryContactId;
     customer.linkPrecedence = linkPrecedence;
+    customer.parentId = parentId;
 
     await contactRepositary.save(customer);
 
@@ -75,26 +77,19 @@ const createContact = async (
  * @returns Boolean
  */
 const isGivenContactDuplicate = (contacts: Contact[], email: string | null, phoneNumber: string | null) => {
-    const isDuplicate = contacts.find((contact) => (
+    const contact = contacts.find((contact) => (
         (contact.email === email && contact.phoneNumber === phoneNumber) ||
         (email === null && contact.phoneNumber === phoneNumber) ||
         (contact.email === email && phoneNumber === null)
     ));
 
-    return !!isDuplicate;
-}
+    // if two different contacts are present with each containing email and phoneNumber, then avoid creating new contact
+    const contactsWithEmail = contacts.filter((contact) => contact.email === email);
+    const contactsWithPhone = contacts.filter((contact) => contact.phoneNumber === phoneNumber);
 
-/**
- * extract email, phone and secondary contacts as seperate arrays
- * @param existingContacts 
- * @returns { emails: [], phoneNumbers: [], secondaryContactIds: []}
- */
-const extractContactData = (existingContacts: Contact[]) => {
-    const emails = existingContacts.map(({ email }) => email).filter((email) => !!email);
-    const phoneNumbers = existingContacts.map(({ phoneNumber }) => phoneNumber).filter((phoneNumber) => !!phoneNumber);
-    const secondaryContactIds = existingContacts.map(({ linkedId }) => linkedId).filter((linkedId) => !!linkedId);
+    let isDuplicate = (contactsWithEmail?.length > 0 && contactsWithPhone?.length > 0) ? true : false;
 
-    return { emails, phoneNumbers, secondaryContactIds };
+    return !!contact || isDuplicate;
 }
 
 /**
@@ -106,4 +101,17 @@ const findPrimaryContacts = (contacts: Contact[]) => {
     return contacts.filter((contact) => contact.linkPrecedence === 'primary');
 }
 
-export { findExistingContacts, getAllContacts, createContact, isGivenContactDuplicate, findPrimaryContacts };
+/**
+ * Contact rows are linked if they have either of email or phone as common.
+ * @param contacts 
+ * @param email 
+ * @param phoneNumber 
+ * @returns Number
+ */
+const findLinkedId = (contacts: Contact[], email: string | null, phoneNumber: string | null) => {
+    const contact = contacts.find((contact) => (contact.email === email || contact.phoneNumber === phoneNumber));
+
+    return contact?.id || null;
+}
+
+export { findExistingContacts, getAllContacts, createContact, isGivenContactDuplicate, findPrimaryContacts, findLinkedId };

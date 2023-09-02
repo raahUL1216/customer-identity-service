@@ -4,7 +4,7 @@ import { initializeResponse } from '../models/response';
 import { Contact } from '../entity/contact';
 import { AppDataSource } from '../database';
 
-import { createContact, findExistingContacts, findPrimaryContacts, getAllContacts, isGivenContactDuplicate } from '../utils/customer';
+import { createContact, findExistingContacts, findLinkedId, findPrimaryContacts, getAllContacts, isGivenContactDuplicate } from '../utils/customer';
 
 const router = express.Router();
 
@@ -19,7 +19,6 @@ router.post('/identify', async (req: Request, res: Response) => {
 
     try {
         const existingContacts = await findExistingContacts(email, phoneNumber);
-        console.log(`total existing contacts: ${existingContacts.length}`);
 
         if (existingContacts.length === 0) {
             // if new contact details provided, create primary contact
@@ -33,7 +32,8 @@ router.post('/identify', async (req: Request, res: Response) => {
             response.emails.push(newContact.email);
             response.phoneNumbers.push(newContact.phoneNumber);
         } else {
-            const contacts = await getAllContacts(existingContacts);
+            const parentIds = existingContacts.map((contact) => (contact.parentId || contact.id))
+            const contacts = await getAllContacts(parentIds);
             console.log(contacts);
 
             const primaryContacts = findPrimaryContacts(contacts);
@@ -43,11 +43,10 @@ router.post('/identify', async (req: Request, res: Response) => {
             response.primaryContactId = primaryContactId;
             response.emails = contacts.map(({ email }) => email);
             response.phoneNumbers = contacts.map(({ phoneNumber }) => phoneNumber);
+            response.secondaryContactIds = contacts.filter((contact) => contact.id !== primaryContactId).map((contact) => contact.id);
 
             if (primaryContacts.length == 1) {
                 // create secondary contact if there is only 1 primary contact and given contact is new
-                response.secondaryContactIds = contacts.filter((contact) => contact.id !== primaryContactId).map((contact) => contact.id);
-
                 const isDuplicate = isGivenContactDuplicate(
                     contacts,
                     email,
@@ -58,11 +57,14 @@ router.post('/identify', async (req: Request, res: Response) => {
 
                 if (!isDuplicate) {
                     console.log('creating secondary contact');
+                    const linkedId = findLinkedId(contacts, email, phoneNumber);
+
                     const contact = await createContact(
                         email,
                         phoneNumber,
                         'secondary',
-                        existingContacts[0].id
+                        linkedId,
+                        primaryContactId
                     );
 
                     response.emails.push(contact.email);
@@ -76,6 +78,7 @@ router.post('/identify', async (req: Request, res: Response) => {
                     let contact = primaryContacts[index];
                     contact.linkedId = primaryContactId;
                     contact.linkPrecedence = 'secondary';
+                    contact.parentId = primaryContactId;
 
                     await contactRepositary.save(contact);
                     response.secondaryContactIds.push(contact.id);
